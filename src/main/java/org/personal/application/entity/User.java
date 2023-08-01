@@ -1,7 +1,7 @@
 package org.personal.application.entity;
 
-import jakarta.persistence.*;
 import lombok.Data;
+import javax.persistence.*;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
@@ -29,4 +29,8 @@ public class User implements Serializable {
 
     @Column(name = "update_time", nullable = false)
     private LocalDateTime updateTime;
+
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
+    @PrimaryKeyJoinColumn
+    private PasswordResetToken passwordResetToken;
 }

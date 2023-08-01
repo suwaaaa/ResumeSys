@@ -2,6 +2,7 @@ package org.personal.application.entity;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+
 import java.util.Collection;
 import java.util.Collections;
 
@@ -14,7 +15,7 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 返回一个空的权限集合，因为用户模型没有定义权限或角色
+        // 返回一个空的权限集合>>用户模型没有定义权限或角色
         return Collections.emptyList();
     }
 

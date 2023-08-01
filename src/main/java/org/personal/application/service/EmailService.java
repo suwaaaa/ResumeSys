@@ -1,9 +1,10 @@
 package org.personal.application.service;
 
-import jakarta.annotation.Resource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+
+import javax.annotation.Resource;
 
 @Service
 public class EmailService {

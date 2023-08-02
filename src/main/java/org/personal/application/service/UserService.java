@@ -2,9 +2,10 @@ package org.personal.application.service;
 
 import org.personal.application.entity.PasswordResetToken;
 import org.personal.application.entity.User;
+import org.personal.application.repository.PasswordResetTokenRepository;
 import org.personal.application.repository.UserRepository;
 import org.personal.application.utils.JwtTokenUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,29 +19,25 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenUtil jwtTokenUtil;
-
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final JavaMailSender mailSender;
 
     public UserService(UserRepository userRepository,
                        JwtTokenUtil jwtTokenUtil,
                        PasswordEncoder passwordEncoder,
-                       EmailService emailService,
+                       PasswordResetTokenRepository passwordResetTokenRepository,
                        JavaMailSender mailSender) {
         this.userRepository = userRepository;
         this.jwtTokenUtil = jwtTokenUtil;
         this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
         this.mailSender = mailSender;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
     public User findByUsername(String username){
         return userRepository.findByUsername(username);
-    }
-    public User findByEmail(String userEmail){
-        return userRepository.findByEmail(userEmail);
     }
     public boolean existsByUsername(User user) {
         return userRepository.existsByUsername(user.getUsername());
@@ -63,62 +60,62 @@ public class UserService {
         throw new IllegalArgumentException("Invalid username or password");
     }
 
-
-    public void createPasswordResetTokenForUser(User user, String token) {
-        PasswordResetToken myToken = new PasswordResetToken(token, user);
-        //To do ...
-        //passwordTokenRepository.save(myToken);
-    }
-
     // 密码找回，根据邮箱或电话号码，这里仅展示根据邮箱找回
     public void retrievePassword(String email) {
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new IllegalArgumentException("No user found with this email");
+        // 步骤 1: 检查用户是否存在
+        Optional<User> userOptional = Optional.ofNullable(userRepository.findByEmail(email));
+        if (userOptional.isEmpty()) {
+            throw new RuntimeException("User not found with email: " + email);
         }
-        // Send password to the user's email
+        User user = userOptional.get();
+        String resetToken = UUID.randomUUID().toString();
+        // 步骤 2: 创建密码重置令牌并存储到数据库
+        createPasswordResetTokenForUser(user, resetToken);
+        // 步骤 3: 发送包含重置链接的邮件到用户邮箱
+        sendPasswordResetMail(email,resetToken);
+    }
+    public void createPasswordResetTokenForUser(User user, String token) {//创建密码重置令牌并存储到数据库
+        PasswordResetToken myToken = new PasswordResetToken(token, user);
+        passwordResetTokenRepository.save(myToken);
     }
 
-    public void sendPasswordResetMail(String to, String token) {
+    public void sendPasswordResetMail(String to, String token) {//发送包含重置链接的邮件到用户邮箱
         SimpleMailMessage passwordResetEmail = new SimpleMailMessage();
         String appUrl = "http://localhost:8080";
         String resetUrl = appUrl + "/reset?token=" + token;
-        passwordResetEmail.setFrom("support@your-domain.com");
+        passwordResetEmail.setFrom("1297822261@qq.com");
         passwordResetEmail.setTo(to);
         passwordResetEmail.setSubject("Password Reset Request");
         passwordResetEmail.setText("To reset your password, click the link below:\n" + resetUrl);
         mailSender.send(passwordResetEmail);
     }
 
-    // 用户注销，这通常在web应用中是销毁session或者使得token失效，在这里不做具体实现
+    /*
+    // 注销用户
+
+    */
     public void logout(String token) {
-        // No operations for a simple demo, usually invalidate the session or token in real projects.
-//        localStorage.removeItem('token');
-
+        System.out.println(token);
+        //用户注销，这通常在web应用中是销毁session或者使得token失效
+//        function logout() {
+//            // 删除存储的JWT
+//            localStorage.removeItem('token');
+//        }
     }
 
-    // 从JWT解析出User信息
-//    public User getUserFromToken(String token) {
-//        return jwtTokenUtil.getUserFromToken(token);
-//    }
-
-
-    public void forgotPassword(String email) {
-        Optional<User> userOptional = Optional.ofNullable(userRepository.findByEmail(email));
-        if (!userOptional.isPresent()) {
-            throw new RuntimeException("User not found with email: " + email);
+    public ResponseEntity<String> resetPassword(String token, String newPassword){
+        // 步骤 1: 从数据库查找令牌
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token);
+        if (resetToken == null) {
+            return ResponseEntity.badRequest().body("Invalid or expired password reset token");
         }
-        User user = userOptional.get();
-        String resetToken = UUID.randomUUID().toString();
-//        user.setResetToken(resetToken);
-
-        // Save user's reset token to verify it later
+        // 步骤 2: 更新用户密码
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
-
-        // Send email to user with the reset token
-        String subject = "Password reset request";
-        String text = "To reset your password, click the link below:\n" +
-                "http://www.example.com/reset-password?token=" + resetToken;
-        emailService.sendSimpleMessage(email, subject, text);
+        // 步骤 3: 删除令牌
+        passwordResetTokenRepository.delete(resetToken);
+        return ResponseEntity.ok().body("Password reset successfully");
     }
+
 }
